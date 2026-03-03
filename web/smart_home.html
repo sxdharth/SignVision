@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignVision | Smart Automation</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f0f12;
+            --card-bg: #1e1e24;
+            --accent: #00e676;
+            /* IoT Green */
+            --accent-off: #333;
+            --text: #fff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .back-btn {
+            text-decoration: none;
+            color: #fff;
+            background: #333;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #444;
+        }
+
+        /* MAIN LAYOUT */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 30px;
+            flex: 1;
+        }
+
+        /* LEFT: WEBCAM CONTROLLER */
+        .camera-panel {
+            background: #000;
+            border-radius: 20px;
+            border: 1px solid #333;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cam-feed {
+            flex: 1;
+            position: relative;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        .status-bar {
+            padding: 15px;
+            background: #111;
+            text-align: center;
+            border-top: 1px solid #333;
+        }
+
+        /* NEW: State border feedback */
+        .camera-panel.state-detecting {
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 15px rgba(0, 230, 118, 0.2);
+        }
+
+        .camera-panel.state-cooldown {
+            border: 2px solid #ff3b30;
+            box-shadow: 0 0 15px rgba(255, 59, 48, 0.2);
+        }
+
+        .camera-panel.state-executing {
+            border: 2px solid #007bff;
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.2);
+            animation: pulse-blue 1s infinite alternate;
+        }
+
+        @keyframes pulse-blue {
+            0% {
+                box-shadow: 0 0 5px rgba(0, 123, 255, 0.1);
+            }
+
+            100% {
+                box-shadow: 0 0 20px rgba(0, 123, 255, 0.4);
+            }
+        }
+
+        .last-cmd {
+            color: var(--text);
+            font-weight: bold;
+            font-size: 1.2rem;
+            transition: color 0.3s;
+        }
+
+        .last-cmd.success {
+            color: var(--accent);
+        }
+
+        /* RIGHT: DEVICES GRID */
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            align-content: start;
+        }
+
+        .device-card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 180px;
+            transition: 0.3s;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .device-icon {
+            font-size: 2.5rem;
+            color: #555;
+            margin-bottom: 10px;
+            transition: 0.3s;
+        }
+
+        .device-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .device-status {
+            font-size: 0.9rem;
+            color: #777;
+            margin-top: 5px;
+        }
+
+        /* ACTIVE STATE */
+        .device-card.active {
+            border-color: var(--accent);
+            background: rgba(0, 230, 118, 0.05);
+        }
+
+        .device-card.active .device-icon {
+            color: var(--accent);
+            text-shadow: 0 0 15px var(--accent);
+        }
+
+        .device-card.active .device-status {
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="brand"><i class="fas fa-home" style="color:var(--accent); margin-right:10px;"></i>SignVision IoT
+        </div>
+        <div style="display: flex; gap: 15px;">
+            <button id="automationToggleBtn" onclick="toggleAutomation()" class="back-btn"
+                style="background:#ff3b30; border:none; cursor:pointer;" title="Pause Automation">
+                <i class="fas fa-pause"></i> <span>Stop Automation</span>
+            </button>
+            <a href="index.html" class="back-btn"><i class="fas fa-video"></i> Back to Video Call</a>
+        </div>
+    </header>
+
+    <div class="main-grid">
+
+        <div class="camera-panel state-detecting" id="camPanel">
+            <div class="cam-feed">
+                <video id="webcam" autoplay playsinline muted></video>
+                <canvas id="skeletonCanvas"></canvas>
+            </div>
+            <div class="status-bar">
+                <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 5px;" id="modeIndicator">DETECTING...</div>
+                <div class="last-cmd" id="cmdDisplay">Waiting for sign...</div>
+            </div>
+        </div>
+
+        <div class="devices-grid">
+            <div class="device-card" id="dev-light">
+                <i class="fas fa-lightbulb device-icon"></i>
+                <div>
+                    <div class="device-name">Smart Light</div>
+                    <div class="device-status">OFF</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal for Camera Issues -->
+    <div id="errorModal" class="modal-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+        <div class="modal-content"
+            style="background: var(--card-bg); padding: 30px; border-radius: 15px; border: 2px solid #ff3b30; max-width: 400px; text-align: center;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ff3b30; margin-bottom: 15px;"></i>
+            <h2>Camera Access Denied</h2>
+            <p id="errorMessage" style="margin: 15px 0; color: #ccc;">
+                Browser blocked camera access or no camera was found. Smart automation requires a camera payload to
+                function.
+            </p>
+            <button onclick="document.getElementById('errorModal').style.display='none'"
+                style="background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px;">Retry
+                / Close</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script>
+
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('skeletonCanvas');
+        const ctx = canvas.getContext('2d');
+        const cmdDisplay = document.getElementById('cmdDisplay');
+
+        // SETUP
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                video.srcObject = stream;
+                return true;
+            } catch (err) {
+                console.error("Camera Setup Error:", err);
+                document.getElementById('errorModal').style.display = 'flex';
+                // Stop automation immediately if camera fails
+                if (automationActive) toggleAutomation();
+                const modeIndicator = document.getElementById('modeIndicator');
+                modeIndicator.innerText = "CAMERA DISABLED";
+                modeIndicator.style.color = "#ff3b30";
+                cmdDisplay.innerText = "Error: Camera Access required.";
+                return false;
+            }
+        }
+
+        function drawSkeleton() {
+            // Disabled per user request
+            // We still need to keep the canvas clear to avoid old drawings from sticking around if it was previously active.
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // TOGGLE DEVICE UI
+        async function toggleDevice(id, state) {
+            const card = document.getElementById(id);
+            const statusText = card.querySelector('.device-status');
+
+            if (state) {
+                card.classList.add('active');
+                statusText.innerText = (id === 'dev-door') ? "UNLOCKED" : "ON";
+            } else {
+                card.classList.remove('active');
+                statusText.innerText = (id === 'dev-door') ? "LOCKED" : "OFF";
+            }
+        }
+
+        // SOCKET.IO REALTIME PREDICTIONS
+        const socket = io(); // Connects to the same host that served the page
+
+        socket.on('connect', () => {
+            console.log("Connected to server, setting IoT mode");
+            cmdDisplay.innerText = "Connected. Scanning for signs...";
+            socket.emit('set_mode', 'iot');
+        });
+
+        // Track current state to handle toggling
+        let deviceStates = {
+            'dev-light': false
+        };
+
+        // Engine status updates from backend removed to prevent conflicting with the local 3s/2s detection cycle.
+
+        // Track current execution state to freeze detection
+        let isExecuting = false;
+
+        socket.on('prediction', async (data) => {
+            if (isExecuting) return; // Ignore any late predictions if already executing
+            if (!isDetectingWindow) return; // Ignore outside of detection window
+
+            console.log("Prediction received:", data);
+
+            // Always display the top guess from the backend, even if it's low confidence
+            cmdDisplay.innerText = `Top Match: ${data.text} (${Math.round(data.conf * 100)}%)`;
+            cmdDisplay.style.animation = "none";
+            setTimeout(() => cmdDisplay.style.animation = "fadeIn 0.2s", 10);
+
+            // ONLY EXECUTE IF CONFIDENCE REACHES 65%
+            if (data.conf < 0.65) {
+                return;
+            }
+
+            isExecuting = true;
+            isDetectingWindow = false; // Stop accepting new signs
+
+            const cmd = data.text.toLowerCase();
+            const camPanel = document.getElementById('camPanel');
+            const modeIndicator = document.getElementById('modeIndicator');
+
+            // Visual freeze for executing state
+            camPanel.className = 'camera-panel state-executing';
+            camPanel.style.borderColor = ""; // Reset inline style
+            modeIndicator.innerText = "EXECUTING COMMAND...";
+            modeIndicator.style.color = "#007bff";
+            cmdDisplay.innerText = `Executing: ${data.text} (${Math.round(data.conf * 100)}%)`;
+            cmdDisplay.className = "last-cmd success";
+
+            // Revert color after a bit
+            setTimeout(() => {
+                cmdDisplay.className = "last-cmd";
+            }, 1000);
+
+            cmdDisplay.style.animation = "none";
+            setTimeout(() => cmdDisplay.style.animation = "fadeIn 0.2s", 10);
+
+            // Simulate device response delay
+            await delay(2000);
+
+            if (cmd === "bulb_on" || cmd === "light") {
+                deviceStates['dev-light'] = true;
+                await toggleDevice('dev-light', true);
+            }
+            else if (cmd === "bulb_off") {
+                deviceStates['dev-light'] = false;
+                await toggleDevice('dev-light', false);
+            }
+
+            cmdDisplay.innerText = "Command Executed Successfully";
+            await delay(1000); // Briefly show success before continuing
+
+            isExecuting = false;
+        });
+
+        // SEND FRAMES TO BACKEND FOR PREDICTION
+        let transInterval = null;
+        let isDetectingWindow = true;
+
+        // sleep helper
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        // 4 seconds on, 3 seconds off
+        let automationActive = true;
+
+        function toggleAutomation() {
+            automationActive = !automationActive;
+            const btn = document.getElementById('automationToggleBtn');
+            const icon = btn.querySelector('i');
+            const text = btn.querySelector('span');
+            const camPanel = document.getElementById('camPanel');
+            const modeIndicator = document.getElementById('modeIndicator');
+
+            if (automationActive) {
+                btn.style.background = '#ff3b30';
+                icon.className = 'fas fa-pause';
+                text.innerText = 'Stop Automation';
+            } else {
+                btn.style.background = 'var(--accent)';
+                icon.className = 'fas fa-play';
+                text.innerText = 'Start Automation';
+
+                // Set UI to paused state immediately
+                camPanel.className = 'camera-panel';
+                camPanel.style.borderColor = '#555';
+                modeIndicator.innerText = "AUTOMATION PAUSED";
+                modeIndicator.style.color = "#aaa";
+                cmdDisplay.innerText = "System Idle - Turning OFF all devices...";
+                isDetectingWindow = false;
+
+                // Send OFF command for all currently ON devices
+                for (const dev_id in deviceStates) {
+                    if (deviceStates[dev_id]) {
+                        // Determine the underlying "sign" command that maps to off
+                        let offCmd = "";
+                        if (dev_id === 'dev-light') offCmd = "bulb_off";
+                        // Add other devices here as they are added to the system
+
+                        if (offCmd !== "") {
+                            socket.emit('prediction', { text: offCmd, conf: 1.0 }); // Force execution
+                            deviceStates[dev_id] = false;
+                            toggleDevice(dev_id, false);
+                        }
+                    }
+                }
+
+                setTimeout(() => { if (!automationActive) cmdDisplay.innerText = "System Idle"; }, 2000);
+            }
+        }
+
+        async function startDetectionCycle() {
+            const camPanel = document.getElementById('camPanel');
+            const modeIndicator = document.getElementById('modeIndicator');
+
+            while (true) {
+                if (!automationActive) {
+                    await delay(500);
+                    continue; // Wait until automation is turned back on
+                }
+
+                if (isExecuting) {
+                    await delay(100);
+                    continue; // Wait until execution clears before restarting cycle
+                }
+
+                // Phase 1: Detecting (up to 4s)
+                isDetectingWindow = true;
+                camPanel.className = 'camera-panel state-detecting';
+                camPanel.style.borderColor = ""; // Reset inline style
+                modeIndicator.innerText = "DETECTING (4s)...";
+                modeIndicator.style.color = "#00e676";
+                cmdDisplay.innerText = "Waiting for sign...";
+
+                // Wait up to 4 seconds, aborting early if a sign is recognized
+                let detectMs = 0;
+                while (detectMs < 4000) {
+                    if (isExecuting || !automationActive) break; // Command detected or paused, aborting the wait
+                    await delay(100);
+                    detectMs += 100;
+                }
+
+                if (!automationActive) continue;
+
+                // If we aborted because of execution, wait until execution finishes before the cooldown
+                while (isExecuting) {
+                    await delay(100);
+                }
+
+                // Phase 2: Cooldown Gap (3s)
+                isDetectingWindow = false;
+                camPanel.className = 'camera-panel state-cooldown';
+                modeIndicator.innerText = "GAP (3s) - PAUSED...";
+                modeIndicator.style.color = "#ff3b30";
+
+                let gapMs = 0;
+                while (gapMs < 3000) {
+                    if (!automationActive) break;
+                    await delay(100);
+                    gapMs += 100;
+                }
+            }
+        }
+
+        function startTranslation() {
+            const processCanvas = document.createElement('canvas');
+            const context = processCanvas.getContext('2d');
+
+            transInterval = setInterval(() => {
+                if (!video.srcObject) return;
+
+                // CRITICAL FIX: Only send frames when actively detecting.
+                // This gives the backend time to clear its sequence buffer during the gap,
+                // guaranteeing that new signs require a completely fresh 2-second capture.
+                if (!isDetectingWindow) return;
+
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                    processCanvas.width = video.videoWidth;
+                    processCanvas.height = video.videoHeight;
+
+                    // Draw frame
+                    context.drawImage(video, 0, 0, processCanvas.width, processCanvas.height);
+
+                    // Compress to JPEG
+                    const dataUrl = processCanvas.toDataURL('image/jpeg', 0.5);
+
+                    // Send to server
+                    socket.emit('process_frame', dataUrl);
+                }
+            }, 66); // 15 FPS (1000ms / 15 frames)
+        }
+
+        window.onload = () => {
+            setupCamera().then((success) => {
+                if (success) {
+                    drawSkeleton();
+                    startDetectionCycle();
+                    startTranslation(); // Start sending frames once camera is ready
+                }
+            });
+        };
+    </script>
+</body>
+
+</html>

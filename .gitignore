@@ -1,0 +1,29 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS
+.DS_Store
+
+# Data & Models (Do not push large datasets and weights)
+Data/
+Models/
+Logs/
+asl_dataset/
+asl_dataset_video/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo

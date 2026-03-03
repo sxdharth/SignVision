@@ -1,0 +1,17 @@
+opencv-python
+mediapipe
+numpy
+tensorflow
+h5py
+pyttsx3
+deep-translator
+gTTS
+pygame
+scikit-learn
+matplotlib
+pandas
+aiohttp
+python-socketio[client]
+beautifulsoup4
+requests
+pyserial

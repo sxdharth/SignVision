@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignVision | Video Connect</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f0f12;
+            --bg-panel: #18181b;
+            --accent: #6366f1; /* Indigo */
+            --accent-glow: rgba(99, 102, 241, 0.5);
+            --text-main: #ffffff;
+            --text-muted: #a1a1aa;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
+
+        .app-container { display: flex; width: 100%; height: 100%; padding: 16px; gap: 16px; }
+
+        /* --- VIDEO STAGE --- */
+        .video-stage {
+            flex: 1; position: relative; background: #000; border-radius: 24px; overflow: hidden;
+            border: 1px solid var(--glass-border); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .remote-video { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+
+        /* CAPTIONS */
+        .captions-overlay {
+            position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(10px);
+            padding: 12px 24px; border-radius: 12px; font-size: 1.2rem; font-weight: 500;
+            text-align: center; min-width: 300px; border: 1px solid rgba(255,255,255,0.1);
+            opacity: 0; transition: all 0.3s ease;
+        }
+        .captions-overlay.active { opacity: 1; bottom: 120px; }
+        .translation-sub { display: block; font-size: 0.9rem; color: #aaa; margin-top: 4px; font-style: italic; }
+
+        /* PIP (LOCAL USER) */
+        .local-pip {
+            position: absolute; bottom: 20px; right: 20px; width: 240px; height: 160px;
+            background: #222; border-radius: 16px; overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.1); z-index: 10;
+        }
+        .local-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .ai-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 350px; background: var(--bg-panel); border-radius: 24px;
+            border: 1px solid var(--glass-border); display: flex; flex-direction: column;
+        }
+        .sidebar-header {
+            padding: 20px; border-bottom: 1px solid var(--glass-border);
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+        
+        /* Navigation & Settings */
+        .nav-btn {
+            background: var(--glass); border: 1px solid var(--glass-border); color: var(--text-main);
+            padding: 8px 12px; border-radius: 8px; cursor: pointer; text-decoration: none; font-size: 0.85rem;
+            display: flex; align-items: center; gap: 8px; transition: 0.2s;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); }
+        
+        select {
+            background: #222; color: white; border: 1px solid #444; padding: 5px 10px; border-radius: 6px; width: 100%;
+        }
+
+        .chat-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .message { background: var(--glass); padding: 12px; border-radius: 12px; font-size: 0.9rem; animation: fadeIn 0.3s ease; }
+        .message.ai { border-left: 3px solid var(--accent); background: rgba(99, 102, 241, 0.1); }
+        .msg-meta { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* CONTROLS */
+        .controls-bar {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 12px; background: rgba(24, 24, 27, 0.8); backdrop-filter: blur(12px);
+            padding: 12px; border-radius: 20px; border: 1px solid var(--glass-border); z-index: 20;
+        }
+        .btn-control {
+            width: 50px; height: 50px; border-radius: 16px; border: none; background: var(--glass);
+            color: var(--text-main); font-size: 1.2rem; cursor: pointer; display: flex; justify-content: center; align-items: center;
+        }
+        .btn-control:hover { background: rgba(255,255,255,0.15); }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="video-stage">
+            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80" class="remote-video" alt="Remote Caller">
+            
+            <div class="captions-overlay" id="captionsBox">
+                <span id="captionText">Listening...</span>
+                <span id="captionTrans" class="translation-sub"></span>
+            </div>
+
+            <div class="controls-bar">
+                <button class="btn-control"><i class="fas fa-microphone"></i></button>
+                <button class="btn-control"><i class="fas fa-video"></i></button>
+                <button class="btn-control" style="background: var(--accent);" onclick="alert('AI is Active')"><i class="fas fa-hands-asl-interpreting"></i></button>
+                <button class="btn-control" style="color: #ef4444;"><i class="fas fa-phone-slash"></i></button>
+            </div>
+
+            <div class="local-pip">
+                <video id="webcam" autoplay playsinline muted class="local-video"></video>
+                <canvas id="skeletonCanvas" class="ai-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="header-top">
+                    <span>Transcript</span>
+                    <a href="smart_home.html" class="nav-btn">
+                        <i class="fas fa-home"></i> Smart Home
+                    </a>
+                </div>
+                <div>
+                    <label style="font-size:0.8rem; color:#aaa; margin-bottom:5px; display:block;">Translate to:</label>
+                    <select id="langSelect">
+                        <option value="en">No Translation (English)</option>
+                        <option value="hi">Hindi (हिंदी)</option>
+                        <option value="es">Spanish (Español)</option>
+                        <option value="ml">Malayalam (മലയാളം)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chat-area" id="chatArea">
+                <div class="message">
+                    <span class="msg-meta">System</span>
+                    Video Call Connected. AI Translation Ready.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // MOCK DICTIONARY FOR TRANSLATION SIMULATION
+        const dictionary = {
+            "Hello": { hi: "नमस्ते", es: "Hola", ml: "നമസ്കാരം" },
+            "Good Morning": { hi: "सुप्रभात", es: "Buenos Días", ml: "സുപ്രഭാതം" },
+            "Thank You": { hi: "धन्यवाद", es: "Gracias", ml: "നന്ദി" },
+            "I am Student": { hi: "मैं छात्र हूँ", es: "Soy estudiante", ml: "ഞാൻ ഒരു വിദ്യാർത്ഥിയാണ്" },
+            "Yes": { hi: "हाँ", es: "Sí", ml: "അതെ" }
+        };
+        const vocab = Object.keys(dictionary);
+
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('skeletonCanvas');
+        const ctx = canvas.getContext('2d');
+        const chatArea = document.getElementById('chatArea');
+        const langSelect = document.getElementById('langSelect');
+
+        // WEBCAM SETUP
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+                video.srcObject = stream;
+            } catch (err) { console.error(err); }
+        }
+
+        // SKELETON SIMULATION
+        function drawSkeleton() {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const w = canvas.width, h = canvas.height, time = Date.now() * 0.003;
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = "#6366f1"; ctx.lineWidth = 2; ctx.fillStyle = "#fff";
+            
+            // Hand movement
+            const hx = w/2 + Math.sin(time) * 40, hy = h/2 + Math.cos(time) * 30;
+            ctx.beginPath(); ctx.moveTo(w/2, h); ctx.lineTo(hx, hy); ctx.stroke();
+            ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI*2); ctx.fill();
+            requestAnimationFrame(drawSkeleton);
+        }
+
+        // TRANSLATION LOGIC
+        function startSimulation() {
+            setInterval(() => {
+                if (Math.random() > 0.4) {
+                    const word = vocab[Math.floor(Math.random() * vocab.length)];
+                    const lang = langSelect.value;
+                    let translated = "";
+                    
+                    if (lang !== 'en' && dictionary[word][lang]) {
+                        translated = dictionary[word][lang];
+                    }
+
+                    // Update UI
+                    document.getElementById('captionsBox').classList.add('active');
+                    document.getElementById('captionText').innerText = word;
+                    document.getElementById('captionTrans').innerText = translated;
+
+                    // Add to Chat
+                    const div = document.createElement('div');
+                    div.className = 'message ai';
+                    div.innerHTML = `<span class="msg-meta">You</span>${word} ${translated ? `(${translated})` : ''}`;
+                    chatArea.appendChild(div);
+                    chatArea.scrollTop = chatArea.scrollHeight;
+
+                    setTimeout(() => { document.getElementById('captionsBox').classList.remove('active'); }, 2000);
+                }
+            }, 3500);
+        }
+
+        window.onload = () => { setupCamera(); drawSkeleton(); startSimulation(); };
+    </script>
+</body>
+</html>

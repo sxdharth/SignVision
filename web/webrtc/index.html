@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignVision Call</title>
+    <link rel="stylesheet" href="static/style.css?v=5">
+    <!-- Ionicons for nice icons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Flex Wrapper -->
+        <div class="main-content">
+            <!-- Floating Header -->
+            <header>
+                <h1>SignVision</h1>
+                <div id="connectionStatus" class="status-badge">Disconnected</div>
+            </header>
+
+            <!-- Video Grid -->
+            <div class="video-grid">
+                <!-- Local Video (Initially Floating) -->
+                <div id="localWrapper" class="video-wrapper floating" onclick="swapVideo()">
+                    <video id="localVideo" autoplay playsinline muted></video>
+                    <div class="user-label">You</div>
+                    <!-- Detection Status Badge -->
+                    <div id="detectionStatus" class="status-pill detecting">Detecting</div>
+                    <!-- Floating Captions (Moved inside for relative positioning) -->
+                    <div id="localCaptionBox" class="caption-box hidden">
+                        <span id="localCaptionText">Waiting for signs...</span>
+                    </div>
+                </div>
+                <!-- Remote Video (Initially Main) -->
+                <div id="remoteWrapper" class="video-wrapper main" onclick="swapVideo()">
+                    <video id="remoteVideo" autoplay playsinline></video>
+                    <div class="user-label">Remote</div>
+                    <!-- Floating Captions (Moved here for correct context) -->
+                    <div id="remoteCaptionBox" class="caption-box hidden">
+                        <span id="remoteCaptionText">Waiting for signs...</span>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Bottom Controls -->
+            <div class="controls">
+                <button class="control-btn" id="cameraBtn" onclick="toggleCamera()" title="Toggle Camera">
+                    <ion-icon name="videocam-outline"></ion-icon>
+                </button>
+                <button class="control-btn" id="micBtn" onclick="toggleMic()" title="Toggle Mic">
+                    <ion-icon name="mic-outline"></ion-icon>
+                </button>
+                <button class="control-btn end-call" id="callBtn" onclick="toggleCall()" title="Join/End Call">
+                    <ion-icon name="call-outline"></ion-icon>
+                </button>
+                <button class="control-btn" id="transBtn" onclick="toggleTranslation()" title="Live Signs">
+                    <ion-icon name="hand-left-outline"></ion-icon>
+                </button>
+                <button class="control-btn" id="spellBtn" onclick="toggleSpelling()" title="Spelling Mode">
+                    <ion-icon name="text-outline"></ion-icon>
+                </button>
+                <button class="control-btn" id="chatBtn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                    <ion-icon name="chatbubbles-outline"></ion-icon>
+                </button>
+            </div>
+        </div>
+
+        <!-- Smart Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Smart Chat</h2>
+                <div class="sidebar-actions">
+                    <select id="langSelect" class="lang-select" onchange="changeLanguage()">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="hi">Hindi</option>
+                        <option value="de">German</option>
+                    </select>
+                    <button id="ttsBtn" onclick="toggleTTS()" class="icon-btn" title="Read Aloud">
+                        <ion-icon name="volume-high-outline"></ion-icon>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Box for Text-to-Sign -->
+            <div class="search-container" style="padding: 10px; display: flex; gap: 5px;">
+                <input type="text" id="signSearchInput" placeholder="Search sign..."
+                    style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                <button onclick="searchAndPlaySign()" class="icon-btn"
+                    style="background: #007bff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer;">
+                    <ion-icon name="search"></ion-icon>
+                </button>
+            </div>
+
+            <!-- Text-to-Sign Player -->
+            <div id="signPlayerContainer" class="sign-player hidden">
+                <video id="signVideo" muted playsinline></video>
+                <div class="player-label">Sign Interpretation</div>
+            </div>
+
+            <div id="chatLog" class="chat-log">
+                <div class="chat-msg system">Welcome to SignVision Chat.</div>
+            </div>
+
+            <div class="chat-input-area">
+                <button onclick="toggleDictation()" id="dictateBtn" class="icon-btn mic">
+                    <ion-icon name="mic-outline"></ion-icon>
+                </button>
+                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleEncrypt(event)">
+                <button onclick="sendMessage()" class="icon-btn send">
+                    <ion-icon name="send"></ion-icon>
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Camera Access Denied</h2>
+            <p id="errorMessage">
+                Browser blocked camera access. If you are on a different device than the server,
+                camera access is often blocked on <b>HTTP</b> sites.
+            </p>
+            <p>
+                <b>Solution:</b><br>
+                1. Use <b>Firefox</b> on the second device.<br>
+                2. Or enable "Insecure origins treated as secure" in Chrome flags.
+            </p>
+            <button class="modal-btn"
+                onclick="document.getElementById('errorModal').classList.remove('show')">Close</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="static/script.js"></script>
+</body>
+
+</html>

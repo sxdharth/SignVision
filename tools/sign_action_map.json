@@ -1,0 +1,34 @@
+{
+    "light": {
+        "device": "dev-light",
+        "action": "toggle"
+    },
+    "fan": {
+        "device": "dev-fan",
+        "action": "toggle"
+    },
+    "tv": {
+        "device": "dev-tv",
+        "action": "toggle"
+    },
+    "door": {
+        "device": "dev-door",
+        "action": "toggle"
+    },
+    "help": {
+        "device": "dev-light",
+        "action": "on"
+    },
+    "stop": {
+        "device": "dev-fan",
+        "action": "off"
+    },
+    "bulb_on": {
+        "device": "dev-light",
+        "action": "on"
+    },
+    "bulb_off": {
+        "device": "dev-light",
+        "action": "off"
+    }
+}
