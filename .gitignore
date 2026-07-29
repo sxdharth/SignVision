@@ -1,5 +1,6 @@
-# Environments
+# Environments & Secrets
 .env
+.env.*
 .venv
 env/
 venv/
@@ -11,19 +12,48 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+*.pyc
 
-# OS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Data & Models (Do not push large datasets and weights)
+# Data & Models (Do not push raw large datasets or intermediate checkpoints)
+# Note: Keep essential demo vocabularies if needed, ignore large raw video files
+*.mp4
+*.avi
+*.mov
+*.mkv
 Data/
 Models/
 Logs/
 asl_dataset/
 asl_dataset_video/
+MISC/asl_dataset/
+MISC/asl_dataset_video/
+wlasl comparison/
 
-# IDEs
+# IDEs & Editor configs
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# AI & Agent runtime
+.agent/
+.gemini/
+
+# Testing & Linting
+.pytest_cache/
+.coverage
+htmlcov/
+*.log

@@ -1,17 +1,28 @@
-opencv-python
-mediapipe
-numpy
-tensorflow
-h5py
-pyttsx3
-deep-translator
-gTTS
-pygame
-scikit-learn
-matplotlib
-pandas
-aiohttp
-python-socketio[client]
-beautifulsoup4
-requests
-pyserial
+# ========================================================
+# SignVision Platform Dependencies
+# ========================================================
+
+# --- Deep Learning, Vision & Feature Extraction ---
+tensorflow>=2.15.0
+mediapipe>=0.10.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+h5py>=3.9.0
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
+pandas>=2.0.0
+
+# --- WebRTC Video Platform & Signaling Server ---
+aiohttp>=3.9.0
+python-socketio[client]>=5.10.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# --- Accessibility: Text-to-Speech & Multi-Language Translation ---
+pyttsx3>=2.90
+deep-translator>=1.11.4
+gTTS>=2.4.0
+pygame>=2.5.0
+
+# --- Hardware IoT Relay Automation ---
+pyserial>=3.5

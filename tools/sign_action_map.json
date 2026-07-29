@@ -3,6 +3,14 @@
         "device": "dev-light",
         "action": "toggle"
     },
+    "fan_on": {
+        "device": "dev-fan",
+        "action": "on"
+    },
+    "fan_off": {
+        "device": "dev-fan",
+        "action": "off"
+    },
     "fan": {
         "device": "dev-fan",
         "action": "toggle"

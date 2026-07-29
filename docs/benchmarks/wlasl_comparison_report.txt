@@ -1,0 +1,10 @@
+SignVision - WLASL Top 100 Comparison Report
+==================================================
+
+Model 1: Bidirectional LSTM (Current)
+Accuracy: 13.84%
+Time: 150.31 s
+
+Model 2: Conv1D + GRU (Proposed)
+Accuracy: 29.46%
+Time: 61.05 s

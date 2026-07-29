@@ -73,11 +73,21 @@ def on_prediction(data):
 
 
 if __name__ == '__main__':
-    try:
-        # Connect to the WebRTC Server (default is localhost:8080)
-        sio.connect('http://localhost:8080')
-        sio.wait()
-    except Exception as e:
-        print(f"Failed to connect to Socket.IO server: {e}")
-        if arduino and arduino.is_open:
-            arduino.close()
+    max_retries = 10
+    for attempt in range(max_retries):
+        try:
+            print(f"Attempting to connect to WebRTC Server (Attempt {attempt+1}/{max_retries})...")
+            # Connect to the WebRTC Server (default is localhost:8080)
+            sio.connect('http://localhost:8080', wait_timeout=15)
+            sio.wait()
+            break # Exit loop if wait() finishes cleanly
+        except Exception as e:
+            print(f"Failed to connect to Socket.IO server: {e}")
+            if attempt < max_retries - 1:
+                print("Retrying in 5 seconds...")
+                time.sleep(5)
+            else:
+                print("Max retries reached. Exiting.")
+                if arduino and arduino.is_open:
+                    arduino.close()
+

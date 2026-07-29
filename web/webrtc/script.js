@@ -15,6 +15,15 @@ let localStream;
 let peerConnection;
 let isCreated = false;
 
+// --- TTS Sign-Language Preference (set on pre-call modal in landing.html) ---
+let ttsSignLang = localStorage.getItem('ttsSignLang') || 'en'; // 'en', 'hi', 'ml'
+const ttsAutoEnabled = localStorage.getItem('ttsAutoEnabled') === 'true';
+
+// --- Accessibility Feature Flags ---
+const accHearing = localStorage.getItem('acc_hearing') === 'true';
+const accSpeech = localStorage.getItem('acc_speech') === 'true';
+
+
 // Config
 const iceServers = {
     iceServers: [
@@ -39,50 +48,77 @@ function showError(msg) {
 
 // --- Button Events ---
 
-callBtn.addEventListener('click', async () => {
+async function toggleCall() {
     // Prevent double clicking
     if (callBtn.disabled) return;
 
     // If not connected, start process
     if (!localStream) {
-        callBtn.innerText = 'Connecting...';
+        callBtn.innerHTML = '<ion-icon name="ellipsis-horizontal-outline"></ion-icon> <span>Connecting...</span>';
+        callBtn.classList.add('has-text');
         callBtn.disabled = true;
 
         await startLocalStream();
 
         if (localStream) {
-            callBtn.innerText = 'Waiting...';
-            // Announce we are ready
-            // The logic: 
-            // 1. We join.
-            // 2. If someone else is ALREADY there, they will receive our 'ready' and THEY will call US.
-            // 3. Wait, if we are the second one, we emit 'ready'. 
-            //    The FIRST person receives 'ready'.
-            //    So the FIRST person (who is already waiting) should call the SECOND person (us).
+            callBtn.innerHTML = '<ion-icon name="cellular-outline"></ion-icon> <span>Waiting...</span>';
             socket.emit('ready');
             isCreated = true;
         } else {
-            callBtn.innerText = 'Join Call';
+            callBtn.innerHTML = '<ion-icon name="call-outline"></ion-icon>';
+            callBtn.classList.remove('has-text');
             callBtn.disabled = false;
         }
-    }
-});
+    } else {
+        // Disconnect logic (End Call)
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        localVideo.srcObject = null;
+        remoteVideo.srcObject = null;
 
-cameraBtn.addEventListener('click', () => {
+        // Reset button to Join state (Green)
+        callBtn.innerHTML = '<ion-icon name="call-outline"></ion-icon>';
+        callBtn.className = 'control-btn start-call';
+        callBtn.title = 'Join Call';
+
+        // Reset Media Buttons
+        updateMediaButton(cameraBtn, false, 'videocam', 'videocam-off');
+        updateMediaButton(micBtn, false, 'mic', 'mic-off');
+
+        // Turn off translation if it was running
+        if (translationEnabled) {
+            toggleTranslation();
+        }
+
+        isCreated = false;
+        showStatus('Disconnected');
+    }
+}
+window.toggleCall = toggleCall;
+
+function toggleCamera() {
     if (localStream) {
         const videoTrack = localStream.getVideoTracks()[0];
         videoTrack.enabled = !videoTrack.enabled;
         updateMediaButton(cameraBtn, videoTrack.enabled, 'videocam', 'videocam-off');
     }
-});
+}
+window.toggleCamera = toggleCamera;
 
-micBtn.addEventListener('click', () => {
+function toggleMic() {
     if (localStream) {
         const audioTrack = localStream.getAudioTracks()[0];
         audioTrack.enabled = !audioTrack.enabled;
         updateMediaButton(micBtn, audioTrack.enabled, 'mic', 'mic-off');
     }
-});
+}
+window.toggleMic = toggleMic;
 
 function updateMediaButton(btn, isEnabled, iconOn, iconOff) {
     const icon = btn.querySelector('ion-icon');
@@ -101,9 +137,25 @@ function updateMediaButton(btn, isEnabled, iconOn, iconOff) {
 
 async function startLocalStream() {
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        // Request HD format for video calling
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: true
+        });
         localVideo.srcObject = localStream;
         showStatus('Camera Ready - Joining...');
+
+        // Sync button states so they visually show up as active (blue)
+        updateMediaButton(cameraBtn, true, 'videocam', 'videocam-off');
+        updateMediaButton(micBtn, true, 'mic', 'mic-off');
+
+        // Auto-enable "Live Signs" if Hearing Impaired profile is active
+        if (accHearing && !translationEnabled) {
+            // Add a small delay so the video element has time to render
+            setTimeout(() => {
+                toggleTranslation();
+            }, 500);
+        }
     } catch (err) {
         console.error('Error accessing media devices:', err);
         let msg = `<b>Camera access failed.</b><br>${err.message}`;
@@ -131,7 +183,12 @@ function createPeerConnection() {
         console.log("Track received");
         remoteVideo.srcObject = event.streams[0];
         showStatus('Connected', 'success');
-        callBtn.innerText = 'Connected';
+
+        // Switch button to End Call state (Red)
+        callBtn.innerHTML = '<ion-icon name="call"></ion-icon>';
+        callBtn.className = 'control-btn end-call active';
+        callBtn.title = 'End Call';
+        callBtn.disabled = false;
     };
 
     peerConnection.onicecandidate = event => {
@@ -210,130 +267,432 @@ socket.on('message', async (data) => {
     }
 });
 
-// --- Live Translation Logic ---
-let translationEnabled = false;
-let transInterval = null;
+// ================================================================
+// PHASED SIGN DETECTION — 4-STATE MACHINE (BATCH MODE)
+// ================================================================
+// State 1: SETUP     (3s, one-time)  → "Setting up camera..." — NO frames captured
+// State 2: LISTENING (4s, countdown) → Frames captured LOCALLY into array
+// State 3: PROCESSING                → Batch sent to backend, wait for result
+// State 4: SHOWING   (2s)            → Display result, then discard & loop to LISTENING
+// ================================================================
 
-function toggleTranslation() {
+let translationEnabled = false;
+
+// State tracking
+const PHASE = { IDLE: 'idle', SETUP: 'setup', LISTENING: 'listening', PROCESSING: 'processing', SHOWING: 'showing' };
+let currentPhase = PHASE.IDLE;
+let hasCompletedSetup = false;
+
+// Batch result from backend
+let batchResult = null;
+let batchResultReceived = false;
+
+// Variables to deduplicate chat log entries
+let lastLogText = null;
+let lastLogTime = 0;
+
+// --- UI Helper ---
+function updateCaptionUI(text, color, boxClass) {
+    const masterBox = document.getElementById('masterCaptionBox');
+    const masterText = document.getElementById('masterCaptionText');
+    if (masterBox) masterBox.className = `call-caption-box ${boxClass || 'state-detecting'}`;
+    if (masterText) {
+        masterText.innerText = text;
+        masterText.style.color = color || '#00e676';
+    }
+}
+
+function updateStatusPill(text, className) {
+    const el = document.getElementById('detectionStatus');
+    if (el) {
+        el.innerText = text;
+        el.className = `status-pill ${className || 'detecting'}`;
+    }
+}
+
+// --- Core Toggle ---
+async function toggleTranslation() {
     translationEnabled = !translationEnabled;
     const btn = document.getElementById('transBtn');
-    const localBox = document.getElementById('localCaptionBox');
-    const remoteBox = document.getElementById('remoteCaptionBox');
+    const masterBox = document.getElementById('masterCaptionBox');
 
     if (translationEnabled) {
+        if (!localVideo.srcObject) {
+            await startLocalStream();
+            if (!localVideo.srcObject) {
+                translationEnabled = false;
+                return;
+            }
+        }
+
         btn.classList.add('active');
-        // Do not immediately show the boxes until there is a prediction
-        startTranslation();
+        masterBox.classList.remove('hidden');
+
+        socket.emit('set_mode', 'general');
+        socket.emit('clear_buffer');
+
+        runPhasedCycle();
     } else {
         btn.classList.remove('active');
-        localBox.classList.add('hidden');
-        remoteBox.classList.add('hidden');
-        stopTranslation();
+        masterBox.classList.add('hidden');
+        const transEl = document.getElementById('masterCaptionTranslation');
+        if (transEl) { transEl.style.display = 'none'; transEl.innerText = ''; }
+
+        currentPhase = PHASE.IDLE;
+        hasCompletedSetup = false;
+        socket.emit('clear_buffer');
     }
 }
 
-function startTranslation() {
-    // Canvas for grabbing frames
+// ================================================================
+// MAIN CYCLE — captures frames locally, sends batch to backend
+// ================================================================
+async function runPhasedCycle() {
+    if (currentPhase !== PHASE.IDLE && currentPhase !== PHASE.SHOWING) return;
+
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 320;
+    canvas.height = 240;
 
-    transInterval = setInterval(() => {
-        if (!remoteVideo.srcObject) return;
+    while (translationEnabled) {
 
-        // Set canvas size to match video
-        if (remoteVideo.videoWidth > 0 && remoteVideo.videoHeight > 0) {
-            canvas.width = remoteVideo.videoWidth / 4; // Scale down for speed
-            canvas.height = remoteVideo.videoHeight / 4;
+        // ═══════════════════════════════════════
+        // PHASE 1: SETUP (3 seconds, one-time)
+        // ═══════════════════════════════════════
+        if (!hasCompletedSetup) {
+            currentPhase = PHASE.SETUP;
+            console.log('[Phase] SETUP — 3s camera warmup');
+            updateCaptionUI('⏳ Setting up camera...', '#ffd54f', 'state-detecting');
+            updateStatusPill('Setting Up', 'cooldown');
 
-            // Draw frame
-            context.drawImage(remoteVideo, 0, 0, canvas.width, canvas.height);
+            socket.emit('clear_buffer');
+            await sleep(3000);
 
-            // Compress to JPEG
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-
-            // Send to server
-            socket.emit('process_frame', dataUrl);
+            if (!translationEnabled) break;
+            hasCompletedSetup = true;
         }
-    }, 200); // 5 FPS is enough for gesture context, maybe increase to 100ms (10 FPS) if fast
+
+        // ═══════════════════════════════════════
+        // PHASE 2: LISTENING (4 seconds — capture frames LOCALLY)
+        // ═══════════════════════════════════════
+        currentPhase = PHASE.LISTENING;
+        let capturedFrames = [];
+        socket.emit('clear_buffer');
+
+        console.log('[Phase] LISTENING — 4s local frame capture');
+
+        // Capture frames at ~15 FPS into local array
+        // Training data was recorded at ~15 FPS effective rate
+        // (cv2.VideoCapture + MediaPipe processing = ~66ms per frame)
+        // 30 frames at 15 FPS = 2 seconds, matching the training data exactly
+        let captureInterval = setInterval(() => {
+            if (currentPhase !== PHASE.LISTENING || !translationEnabled) return;
+            if (localVideo && localVideo.srcObject && localVideo.videoWidth > 0) {
+                ctx.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+                capturedFrames.push(canvas.toDataURL('image/jpeg', 0.7));
+            }
+        }, 66); // ~15 FPS to match training data
+
+        // Countdown UI
+        for (let remaining = 4; remaining >= 1; remaining--) {
+            if (!translationEnabled) break;
+            updateCaptionUI(`👂 Listening... ${remaining}s`, '#00e676', 'state-detecting');
+            updateStatusPill(`Listening ${remaining}s`, 'detecting');
+            await sleep(1000);
+        }
+
+        clearInterval(captureInterval);
+        if (!translationEnabled) {
+            capturedFrames = []; // Clean up memory
+            break;
+        }
+
+        console.log(`[Phase] Captured ${capturedFrames.length} frames locally`);
+
+        // ═══════════════════════════════════════
+        // PHASE 3: PROCESSING — send batch to backend, wait for result
+        // ═══════════════════════════════════════
+        currentPhase = PHASE.PROCESSING;
+        updateCaptionUI('🔍 Analyzing...', '#42a5f5', 'state-executing');
+        updateStatusPill('Analyzing...', 'cooldown');
+
+        // Send ALL captured frames — backend sliding window will find the best 30-frame segment
+        console.log(`[Phase] Sending ${capturedFrames.length} frames to backend for sliding window analysis`);
+
+        // Reset batch result and send
+        batchResult = null;
+        batchResultReceived = false;
+        socket.emit('process_batch', { frames: capturedFrames });
+
+        // Wait for batch_result event (timeout: 20s, or socket disconnect)
+        const waitStart = Date.now();
+        const BATCH_TIMEOUT_MS = 20000;
+        while (!batchResultReceived && translationEnabled && (Date.now() - waitStart < BATCH_TIMEOUT_MS)) {
+            await sleep(200);
+        }
+
+        // Handle timeout — show error instead of silently showing 'No sign'
+        if (!batchResultReceived && translationEnabled) {
+            console.warn('[Phase] Batch timed out — backend may be overloaded or disconnected');
+            updateCaptionUI('⚠️ Analysis timed out. Retrying...', '#ff9800', 'state-executing');
+            updateStatusPill('Timeout', 'cooldown');
+            await sleep(2000);
+            capturedFrames = [];
+            batchResult = null;
+            batchResultReceived = false;
+            socket.emit('clear_buffer');
+            continue; // Restart the cycle from LISTENING
+        }
+
+        if (!translationEnabled) break;
+
+        // ═══════════════════════════════════════
+        // PHASE 4: SHOWING — display result
+        // ═══════════════════════════════════════
+        currentPhase = PHASE.SHOWING;
+
+        if (batchResult && batchResult.text && batchResult.conf >= 0.75) {
+            console.log(`[Phase] SHOWING — "${batchResult.text}" (${(batchResult.conf * 100).toFixed(0)}%)`);
+            await displayResult(batchResult.text, batchResult.conf);
+        } else {
+            console.log('[Phase] SHOWING — No sign detected');
+            updateCaptionUI('❌ No sign detected', '#ef5350', 'state-executing');
+            updateStatusPill('No sign', 'cooldown');
+            await sleep(1500);
+        }
+
+        if (!translationEnabled) break;
+
+        // Discard and restart
+        capturedFrames = [];
+        batchResult = null;
+        batchResultReceived = false;
+        socket.emit('clear_buffer');
+    }
+
+    currentPhase = PHASE.IDLE;
+    console.log('[Phase] IDLE — cycle ended');
 }
 
-function stopTranslation() {
-    if (transInterval) {
-        clearInterval(transInterval);
-        transInterval = null;
-    }
-}
+// ================================================================
+// BATCH RESULT HANDLER — receives prediction from backend
+// ================================================================
+socket.on('batch_result', (data) => {
+    console.log('[Batch Result]', data);
+    batchResult = data;
+    batchResultReceived = true;
+});
 
-// Receive prediction
-socket.on('prediction', (data) => {
-    const { sid, text, conf } = data;
-    const isLocal = sid === socket.id;
+// Keep prediction handler for remote caller display
+socket.on('prediction', async (data) => {
+    // Only show remote predictions (from the other person signing)
+    if (data.sid !== socket.id && data.text) {
+        console.log(`[Remote Prediction] ${data.text} (${(data.conf * 100).toFixed(0)}%)`);
 
-    let targetBox, targetText;
+        // Display in remote caption box
+        const remoteCaptionBox = document.getElementById('remoteCaptionBox');
+        const remoteCaptionText = document.getElementById('remoteCaptionText');
+        if (remoteCaptionBox && remoteCaptionText) {
+            remoteCaptionText.innerText = `${data.text} (${(data.conf * 100).toFixed(0)}%)`;
+            remoteCaptionBox.classList.remove('hidden');
 
-    if (isLocal) {
-        targetBox = document.getElementById('localCaptionBox');
-        targetText = document.getElementById('localCaptionText');
+            // Translate if a non-English language is selected
+            const lang = document.getElementById('langSelect').value;
+            let displayText = data.text;
+            if (lang !== 'en') {
+                try {
+                    const res = await fetch('/translate_sign', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: data.text, target_lang: lang })
+                    });
+                    if (res.ok) {
+                        const tdata = await res.json();
+                        displayText = tdata.translated || data.text;
+                        remoteCaptionText.innerText = `${data.text} → ${displayText}`;
+                    }
+                } catch (e) {
+                    console.warn('[Remote translate error]', e);
+                }
+            }
 
-        // Add to Chat Log as "System/Sign" if local
-        addMessageToLog(`You signed: ${text}`, 'local');
-    } else {
-        targetBox = document.getElementById('remoteCaptionBox');
-        targetText = document.getElementById('remoteCaptionText');
+            // Add to chat log
+            if (data.text !== lastLogText || (Date.now() - lastLogTime > 3000)) {
+                const logMsg = (displayText !== data.text) 
+                    ? `Partner signed: ${displayText}` 
+                    : `Partner signed: ${data.text}`;
+                addMessageToLog(logMsg, 'remote', data.text);
+                lastLogText = data.text;
+                lastLogTime = Date.now();
+            }
 
-        // Add to Chat Log as Remote Sign
-        addMessageToLog(`Remote signed: ${text}`, 'remote');
+            // Speak if TTS is enabled
+            if (ttsEnabled) {
+                speakText(displayText, lang || 'en');
+            }
 
-        // TTS: Speak the predicted sign for remote only!
-        if (ttsEnabled) {
-            speakText(text);
+            // Auto-hide after 3 seconds
+            clearTimeout(window._remoteCaptionTimeout);
+            window._remoteCaptionTimeout = setTimeout(() => {
+                remoteCaptionBox.classList.add('hidden');
+            }, 3000);
         }
-    }
-
-    if (targetBox && targetText) {
-        targetText.innerText = `Sign: ${text} (${(conf * 100).toFixed(0)}%)`;
-        targetBox.classList.remove('hidden');
-
-        // Clear timeout to hide for the specific box
-        const timeoutKey = isLocal ? 'localCaptionTimeout' : 'remoteCaptionTimeout';
-        if (window[timeoutKey]) clearTimeout(window[timeoutKey]);
-
-        window[timeoutKey] = setTimeout(() => {
-            targetBox.classList.add('hidden');
-        }, 3000);
     }
 });
 
-// Receive Engine Status
+// ================================================================
+// ENGINE STATUS — simplified for phased approach
+// ================================================================
 socket.on('engine_status', (data) => {
     const statusEl = document.getElementById('detectionStatus');
     if (!statusEl) return;
 
-    if (data.status === 'detecting') {
-        statusEl.innerText = 'Detecting';
-        statusEl.className = 'status-pill detecting';
-    } else {
-        statusEl.innerText = 'Waiting...';
+    if (data.status === 'loading_model') {
+        statusEl.innerText = 'Loading Model...';
         statusEl.className = 'status-pill cooldown';
+        return;
     }
 });
+
+// ================================================================
+// DISPLAY RESULT — shows the sign with translation/TTS/logging
+// ================================================================
+async function displayResult(text, conf) {
+    const masterBox = document.getElementById('masterCaptionBox');
+    const masterText = document.getElementById('masterCaptionText');
+    const masterTranslation = document.getElementById('masterCaptionTranslation');
+    const sid = (batchResult && batchResult.sid) ? batchResult.sid : socket.id;
+
+    masterBox.className = 'call-caption-box state-executing';
+    masterText.style.color = "#007bff";
+    masterText.innerText = `✅ Sign: ${text} (${(conf * 100).toFixed(0)}%)`;
+    updateStatusPill('Showing', 'cooldown');
+
+    // Reset translation line
+    if (masterTranslation) {
+        masterTranslation.style.display = 'none';
+        masterTranslation.innerText = '';
+    }
+
+    if (sid === socket.id) {
+        // Local signer — log and translate if needed
+        if (text !== lastLogText || (Date.now() - lastLogTime > 3000)) {
+            addMessageToLog(`You signed: ${text}`, 'local');
+            lastLogText = text;
+            lastLogTime = Date.now();
+        }
+
+        // Translate for local signer too
+        const lang = document.getElementById('langSelect').value;
+        if (lang !== 'en') {
+            try {
+                const res = await fetch('/translate_sign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, target_lang: lang })
+                });
+                if (res.ok) {
+                    const tdata = await res.json();
+                    const translated = tdata.translated || text;
+                    if (masterTranslation) {
+                        masterTranslation.innerText = translated;
+                        masterTranslation.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.warn('[Local translate error]', e);
+            }
+        }
+    } else {
+        // Remote signer — log, translate if needed, speak
+        if (text !== lastLogText || (Date.now() - lastLogTime > 3000)) {
+            lastLogText = text;
+            lastLogTime = Date.now();
+        }
+
+        if (ttsEnabled) {
+            const lang = ttsSignLang;
+            if (lang !== 'en') {
+                try {
+                    const res = await fetch('/translate_sign', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, target_lang: lang })
+                    });
+                    if (res.ok) {
+                        const tdata = await res.json();
+                        const translated = tdata.translated || text;
+                        masterText.innerText = `✅ Sign: ${text} (${(conf * 100).toFixed(0)}%)`;
+                        if (masterTranslation) {
+                            masterTranslation.innerText = translated;
+                            masterTranslation.style.display = 'block';
+                        }
+                        addMessageToLog(translated, 'remote', text);
+                        speakText(translated, lang);
+                    } else {
+                        addMessageToLog(text, 'remote');
+                        speakText(text, 'en');
+                    }
+                } catch (fetchErr) {
+                    console.warn('[translate_sign fetch error]', fetchErr);
+                    addMessageToLog(text, 'remote');
+                    speakText(text, 'en');
+                }
+            } else {
+                addMessageToLog(text, 'remote');
+                speakText(text, 'en');
+            }
+        } else {
+            const lang = document.getElementById('langSelect').value;
+            if (lang !== 'en') {
+                try {
+                    const res = await fetch('/translate_sign', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, target_lang: lang })
+                    });
+                    if (res.ok) {
+                        const tdata = await res.json();
+                        const translated = tdata.translated || text;
+                        masterText.innerText = `✅ Sign: ${text} (${(conf * 100).toFixed(0)}%)`;
+                        if (masterTranslation) {
+                            masterTranslation.innerText = translated;
+                            masterTranslation.style.display = 'block';
+                        }
+                        addMessageToLog(translated, 'remote', text);
+                    } else {
+                        addMessageToLog(text, 'remote');
+                    }
+                } catch (e) {
+                    addMessageToLog(text, 'remote');
+                }
+            } else {
+                addMessageToLog(text, 'remote');
+            }
+        }
+    }
+
+    // Show result for 2 seconds
+    await sleep(2000);
+}
+
+// ================================================================
+// UTILITY
+// ================================================================
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // Receive Chat Message
 socket.on('chat_message', (data) => {
-    const isLocal = data.sender === socket.id;
-    addMessageToLog(data.text, isLocal ? 'local' : 'remote', data.original);
-
-    // TTS: Read aloud if remote message or translated
-    if (!isLocal && ttsEnabled) {
-        speakText(data.text, data.lang);
-    }
-
-    // Text-to-Sign: If remote message, try to play signs
-    if (!isLocal) {
+    // Only display remote messages, local messages are handled on send
+    if (data.sender !== socket.id) {
+        addMessageToLog(data.text, 'remote', data.original);
+        if (ttsEnabled) speakText(data.text, data.lang);
         playSignSequence(data.text);
     }
 });
-
 
 // Update window object for HTML access
 window.toggleTranslation = toggleTranslation;
@@ -375,6 +734,17 @@ function swapVideo() {
     }
 }
 window.swapVideo = swapVideo;
+
+// --- Sidebar Toggle ---
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const chatBtn = document.getElementById('chatBtn');
+    if (sidebar) {
+        sidebar.classList.toggle('collapsed');
+        if (chatBtn) chatBtn.classList.toggle('active', !sidebar.classList.contains('collapsed'));
+    }
+}
+window.toggleSidebar = toggleSidebar;
 
 // --- Sidebar & Chat Logic ---
 let ttsEnabled = false;
@@ -419,6 +789,8 @@ function sendMessage() {
     const lang = document.getElementById('langSelect').value;
 
     if (text) {
+        // Optimistically add message to local log before sending to socket
+        addMessageToLog(text, 'local');
         socket.emit('chat_message', { text, target_lang: lang });
         input.value = '';
     }
@@ -435,7 +807,7 @@ function addMessageToLog(text, type, original) {
 
     let content = text;
     if (original && original !== text) {
-        content = `${original}<span class="msg-translation">${text}</span>`;
+        content = `${original} <br><span class="msg-translation" style="font-size: 0.85em; opacity: 0.8; color: #38bdf8;">(${text})</span>`;
     }
 
     msgDiv.innerHTML = content;
@@ -443,18 +815,49 @@ function addMessageToLog(text, type, original) {
     log.scrollTop = log.scrollHeight;
 }
 
-// --- Text-to-Speech ---
+// Apply saved TTS preference from pre-call modal
+if (ttsAutoEnabled) {
+    ttsEnabled = true;
+    const ttsBtn = document.getElementById('ttsBtn');
+    if (ttsBtn) ttsBtn.classList.add('active');
+}
+
+// === AUTO-INITIALIZATION (runs immediately since script loads after DOM) ===
+
+// Set language dropdown
+const _langSel = document.getElementById('langSelect');
+if (_langSel && ttsSignLang) {
+    _langSel.value = ttsSignLang;
+}
+
+// Auto-open Smart Chat sidebar if Speech Impaired profile is active
+if (accSpeech) {
+    toggleSidebar();
+}
+
+// Auto-join the call immediately
+console.log('[SignVision] Auto-joining call...');
+toggleCall();
+
+// --- Text-to-Speech Toggle ---
 function toggleTTS() {
     ttsEnabled = !ttsEnabled;
     const btn = document.getElementById('ttsBtn');
-    btn.classList.toggle('active', ttsEnabled);
+    if (btn) btn.classList.toggle('active', ttsEnabled);
+    // Also sync ttsSignLang with the sidebar language selector if TTS is enabled
+    if (ttsEnabled) {
+        const sel = document.getElementById('langSelect');
+        if (sel && sel.value) ttsSignLang = sel.value;
+    }
 }
+window.toggleTTS = toggleTTS;
+
 
 function speakText(text, lang = 'en') {
     if (!text) return;
     const utterance = new SpeechSynthesisUtterance(text);
-    // Simple Lang mapping
-    const langMap = { 'en': 'en-US', 'es': 'es-ES', 'fr': 'fr-FR', 'hi': 'hi-IN', 'de': 'de-DE' };
+    // Lang mapping — extended with Malayalam
+    const langMap = { 'en': 'en-US', 'es': 'es-ES', 'fr': 'fr-FR', 'hi': 'hi-IN', 'de': 'de-DE', 'ml': 'ml-IN' };
     utterance.lang = langMap[lang] || 'en-US';
     window.speechSynthesis.speak(utterance);
 }
@@ -463,6 +866,12 @@ function changeLanguage() {
     // Just updates the selection for next message
     const lang = document.getElementById('langSelect').value;
     console.log("Language changed to:", lang);
+}
+
+function changeModel() {
+    const arch = document.getElementById('modelSelect').value;
+    console.log("Model architecture changed to:", arch);
+    socket.emit('set_architecture', arch);
 }
 
 // --- Text-to-Sign Player ---
@@ -509,14 +918,9 @@ window.toggleDictation = toggleDictation;
 window.sendMessage = sendMessage;
 window.handleEncrypt = handleEncrypt;
 window.changeLanguage = changeLanguage;
+window.changeModel = changeModel;
 
-function toggleSidebar() {
-    const sidebar = document.querySelector('.sidebar');
-    const btn = document.getElementById('chatBtn');
-    sidebar.classList.toggle('collapsed');
-    btn.classList.toggle('active', !sidebar.classList.contains('collapsed'));
-}
-window.toggleSidebar = toggleSidebar;
+// toggleSidebar is already defined above (line ~640)
 
 // Initial check for speech support
 if (!('webkitSpeechRecognition' in window)) {
@@ -531,6 +935,9 @@ const originalConnect = socket.io.engine.on('open', () => { }); // preserve
 socket.on('connect', () => {
     statusBadge.innerText = "Connected";
     statusBadge.classList.add('connected');
+
+    const arch = document.getElementById('modelSelect').value;
+    socket.emit('set_architecture', arch);
 });
 
 socket.on('disconnect', () => {
@@ -569,6 +976,9 @@ async function searchAndPlaySign() {
                 label.innerText = `Sign for: ${data.word}`;
                 video.src = data.video_url;
                 video.play().catch(e => console.error("Autoplay error:", e));
+
+                // Share with the other person
+                socket.emit('play_sign_video', { word: data.word, url: data.video_url });
             }
         } else {
             label.innerText = `Sign '${word}' not found`;
@@ -584,6 +994,35 @@ async function searchAndPlaySign() {
 }
 
 window.searchAndPlaySign = searchAndPlaySign;
+
+// Handle receiving a shared sign video
+socket.on('play_sign_video', (data) => {
+    const container = document.getElementById('signPlayerContainer');
+    const video = document.getElementById('signVideo');
+    let label = container.querySelector('.player-label');
+
+    if (!label) {
+        label = document.createElement('div');
+        label.className = 'player-label';
+        container.appendChild(label);
+    }
+
+    label.innerText = `Remote shared sign: ${data.word}`;
+    video.src = data.url;
+
+    container.classList.remove('hidden');
+    container.classList.add('show');
+
+    video.play().catch(e => console.error("Autoplay error from remote:", e));
+
+    // Auto hide after a few seconds or when ended
+    video.onended = () => {
+        setTimeout(() => {
+            container.classList.add('hidden');
+            container.classList.remove('show');
+        }, 1000);
+    };
+});
 
 // Bind Enter key
 const searchInput = document.getElementById('signSearchInput');

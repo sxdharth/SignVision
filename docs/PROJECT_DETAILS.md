@@ -73,7 +73,7 @@ graph TD
 
 ### B. Directory Structure
 ```
-SignVision_S8_V2/
+SignVision/
 ├── src/                    # Core Python Application Logic
 │   ├── main_app.py         # Legacy Desktop App (Qt/CV2)
 │   ├── inference_engine.py # The Brain: Loads Model & Predicts

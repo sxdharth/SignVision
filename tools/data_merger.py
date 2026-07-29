@@ -135,9 +135,25 @@ def merge_data():
     
     print(f"Total sequences after balancing: {len(X_balanced)}")
     
-    # Pad sequences
-    X = pad_sequences(X_balanced, maxlen=MAX_LENGTH, padding='post', dtype='float32')
-    y = to_categorical(y, num_classes=len(classes))
+    # Dynamically Pad and Time-Shift sequences
+    print("Padding and applying Random Temporal Shifts...")
+    X_final = []
+    
+    for seq in X_balanced:
+        # Create an empty 30-frame array of zeros
+        padded_seq = np.zeros((MAX_LENGTH, seq.shape[1]), dtype='float32')
+        
+        seq_len = min(len(seq), MAX_LENGTH)
+        # Randomly choose a start index (temporal shift) to simulate live webcam delay
+        max_start_idx = MAX_LENGTH - seq_len
+        start_idx = np.random.randint(0, max_start_idx + 1) if max_start_idx > 0 else 0
+        
+        # Place the gesture inside the 30-frame window at the random offset
+        padded_seq[start_idx : start_idx + seq_len] = seq[:seq_len]
+        X_final.append(padded_seq)
+        
+    X = np.array(X_final)
+    y = to_categorical(y_balanced, num_classes=len(classes))
     
     print(f"X shape: {X.shape}")
     print(f"y shape: {y.shape}")

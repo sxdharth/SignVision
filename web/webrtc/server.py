@@ -1,9 +1,17 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from aiohttp import web
 import socketio
+import asyncio
 
-# Create a Socket.IO server
-sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
+# Create a Socket.IO server with high tolerance for CPU-blocking inference
+sio = socketio.AsyncServer(
+    async_mode='aiohttp', 
+    cors_allowed_origins='*',
+    ping_timeout=60, # Wait 60s for a ping instead of 5s
+    ping_interval=25,
+    max_http_buffer_size=10_000_000 # 10MB buffer for queued frames
+)
 app = web.Application()
 sio.attach(app)
 
@@ -77,6 +85,10 @@ async def search_sign(request):
         print(f"Search error: {e}")
         return web.json_response({'error': str(e)}, status=500)
 
+async def home(request):
+    with open(os.path.join(CURRENT_DIR, 'home.html'), 'r') as f:
+        return web.Response(text=f.read(), content_type='text/html')
+
 async def landing(request):
     with open(os.path.join(CURRENT_DIR, 'landing.html'), 'r') as f:
         return web.Response(text=f.read(), content_type='text/html')
@@ -96,9 +108,35 @@ async def smart_home(request):
         return web.Response(text=f.read(), content_type='text/html', headers=headers)
 
 
-app.router.add_get('/', landing)
+async def translate_sign(request):
+    """Translate a recognized sign word to the user's preferred language."""
+    try:
+        data = await request.json()
+        text = data.get('text', '')
+        target_lang = data.get('target_lang', 'en')
+
+        if not text:
+            return web.json_response({'error': 'Missing text'}, status=400)
+
+        # If target is English, no translation needed
+        if target_lang == 'en':
+            return web.json_response({'original': text, 'translated': text, 'lang': 'en'})
+
+        # Map frontend lang codes to deep_translator codes
+        lang_map = {'hi': 'hi', 'ml': 'ml', 'en': 'en'}
+        dl_lang = lang_map.get(target_lang, 'en')
+
+        translated = GoogleTranslator(source='en', target=dl_lang).translate(text)
+        return web.json_response({'original': text, 'translated': translated, 'lang': target_lang})
+    except Exception as e:
+        print(f"translate_sign error: {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
+app.router.add_get('/', home)
+app.router.add_get('/landing', landing)
 app.router.add_get('/call', call)
 app.router.add_get('/search_sign', search_sign)
+app.router.add_post('/translate_sign', translate_sign)
 app.router.add_get('/smart_home.html', smart_home)
 app.router.add_get('/smart_iot.html', smart_home) # New route to bypass cache
 
@@ -111,36 +149,45 @@ ROOM = 'main_room'
 
 @sio.event
 async def ready(sid):
-    # Broadcast 'ready' to others
-    # The client who receives 'ready' will initiate the offer if they are already there
     print(f"Client {sid} is ready")
-    await sio.emit('ready', skip_sid=sid, room=ROOM)
-
     await sio.emit('ready', skip_sid=sid, room=ROOM)
 
 @sio.event
 async def chat_message(sid, data):
-    # data: { 'text': 'Hello', 'lang': 'es' }
+    # data: { 'text': 'Hello', 'target_lang': 'es' }
     print(f"Chat from {sid}: {data}")
     
     room = ROOM
     # Translation Logic
-    text = data.get('text')
+    text = data.get('text', '')
+    if not text:
+        return
+        
     target_lang = data.get('target_lang', 'en')
     
     translated_text = text
-    try:
-        if target_lang != 'en': # Assuming source is english for now, or auto
-            translated_text = GoogleTranslator(source='auto', target=target_lang).translate(text)
-    except Exception as e:
-        print(f"Translation failed: {e}")
+    if target_lang != 'en':
+        try:
+            # Map frontend lang codes to deep_translator codes
+            lang_map = {'hi': 'hi', 'ml': 'ml', 'en': 'en', 'es': 'es', 'fr': 'fr', 'de': 'de'}
+            dl_lang = lang_map.get(target_lang, 'en')
+            if dl_lang != 'en':
+                translated_text = GoogleTranslator(source='auto', target=dl_lang).translate(text)
+        except Exception as e:
+            print(f"Chat Translation failed: {e}")
+            translated_text = text # Fallback to original
         
     await sio.emit('chat_message', {
         'sender': sid,
         'original': text,
         'text': translated_text,
         'lang': target_lang
-    }, room=room)
+    }, skip_sid=sid, room=room)
+
+@sio.event
+async def play_sign_video(sid, data):
+    # Relays a video URL to the other person in the room so they see the sign
+    await sio.emit('play_sign_video', data, skip_sid=sid, room=ROOM)
 
 @sio.event
 async def message(sid, data):
@@ -162,6 +209,7 @@ sys.path.append(os.path.join(CURRENT_DIR, '../../src'))
 # {sid: InferenceEngine}
 engines = {}
 pending_modes = {}
+pending_architectures = {}
 
 try:
     from src.inference_engine import InferenceEngine
@@ -180,6 +228,11 @@ async def connect(sid, environ):
         try:
             engines[sid] = InferenceEngine()
             print(f"Engine initialized for {sid}")
+            
+            if sid in pending_architectures:
+                engines[sid].set_architecture(pending_architectures.pop(sid))
+                print(f"Applied pending architecture for {sid}")
+                
             if sid in pending_modes:
                 engines[sid].set_mode(pending_modes.pop(sid))
                 print(f"Applied pending mode for {sid}")
@@ -207,6 +260,30 @@ async def set_mode(sid, mode):
         print(f"Pending mode for {sid} set to {mode}")
 
 @sio.event
+async def set_architecture(sid, arch):
+    print(f"Requested architecture switch to {arch} for {sid}")
+    
+    # Notify frontend to pause frames and show 'Loading Model...'
+    await sio.emit('engine_status', {'status': 'loading_model'}, room=sid)
+    await asyncio.sleep(0.1) # Yield to event loop to send the message
+    
+    if sid in engines:
+        # This is a blocking sync call, but necessary to hot-swap Keras graphs
+        engines[sid].set_architecture(arch)
+        status = 'cooldown' if engines[sid].is_cooldown_active else 'detecting'
+        await sio.emit('engine_status', {'status': status}, room=sid)
+        print(f"Successfully hot-swapped {sid} to {engines[sid].architecture}")
+    else:
+        pending_architectures[sid] = arch
+        print(f"Pending arch for {sid} set to {arch}")
+
+@sio.event
+async def clear_buffer(sid):
+    if sid in engines:
+        engines[sid].clear_sequence()
+        # print(f"Buffer cleared for {sid}") # Optional debug
+
+@sio.event
 async def process_frame(sid, data):
     engine = engines.get(sid)
     if engine is None:
@@ -229,11 +306,74 @@ async def process_frame(sid, data):
         status = 'cooldown' if engine.is_cooldown_active else 'detecting'
         await sio.emit('engine_status', {'status': status}, room=sid)
 
+        # Emit prediction to exactly the Sender first to guarantee arrival
         if prediction:
-            await sio.emit('prediction', {'sid': sid, 'text': prediction, 'conf': confidence}, room=ROOM)
+            await sio.emit('prediction', {'sid': sid, 'text': prediction, 'conf': confidence}, room=sid)
+            # Broadcast to remote caller, skipping sender
+            await sio.emit('prediction', {'sid': sid, 'text': prediction, 'conf': confidence}, room=ROOM, skip_sid=sid)
 
     except Exception as e:
         print(f"Frame processing error: {e}")
+
+@sio.event
+async def process_batch(sid, data):
+    """
+    Receives a batch of base64-encoded frames captured on the frontend,
+    decodes them all, and runs predict_batch for a single prediction.
+    """
+    engine = engines.get(sid)
+    if engine is None:
+        await sio.emit('batch_result', {'text': None, 'conf': 0.0}, room=sid)
+        return
+
+    try:
+        frames_b64 = data.get('frames', [])
+        print(f"Received batch of {len(frames_b64)} frames from {sid}")
+
+        if not frames_b64:
+            await sio.emit('batch_result', {'text': None, 'conf': 0.0}, room=sid)
+            return
+
+        # Decode all frames
+        frames = []
+        for frame_data in frames_b64:
+            try:
+                img_data = frame_data.split(',')[1] if ',' in frame_data else frame_data
+                img_bytes = base64.b64decode(img_data)
+                nparr = np.frombuffer(img_bytes, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                if frame is not None:
+                    frames.append(frame)
+            except Exception as e:
+                continue  # Skip corrupted frames
+
+        print(f"Decoded {len(frames)} valid frames from batch")
+
+        if not frames:
+            await sio.emit('batch_result', {'text': None, 'conf': 0.0}, room=sid)
+            return
+
+        # Run batch prediction
+        prediction, confidence = engine.predict_batch(frames)
+
+        result = {
+            'sid': sid,
+            'text': prediction,
+            'conf': float(confidence)
+        }
+        print(f"Batch result: {result}")
+
+        await sio.emit('batch_result', result, room=sid)
+
+        # Also broadcast to remote caller if there's a prediction
+        if prediction:
+            await sio.emit('prediction', result, room=ROOM, skip_sid=sid)
+
+    except Exception as e:
+        print(f"Batch processing error: {e}")
+        import traceback
+        traceback.print_exc()
+        await sio.emit('batch_result', {'text': None, 'conf': 0.0}, room=sid)
 
 if __name__ == '__main__':
     print("Starting WebRTC Signaling Server on http://0.0.0.0:8080")

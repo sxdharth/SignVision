@@ -30,7 +30,9 @@ def process_sequence(seq):
     
     # 1. Base sequence
     if len(seq) > MAX_SEQ_LENGTH:
-        base_seq = seq[:MAX_SEQ_LENGTH]
+        # Evenly sample MAX_SEQ_LENGTH frames across the entire sequence
+        indices = np.linspace(0, len(seq) - 1, MAX_SEQ_LENGTH, dtype=int)
+        base_seq = seq[indices]
     elif len(seq) < MAX_SEQ_LENGTH:
         pad_amount = MAX_SEQ_LENGTH - len(seq)
         padding = np.zeros((pad_amount, feature_size))
@@ -38,30 +40,13 @@ def process_sequence(seq):
     else:
         base_seq = seq
     sequences.append(base_seq)
-    
-    # 2. Augmentation: Shift Left (simulate gesture happened slightly earlier)
-    # 3. Augmentation: Shift Right (simulate gesture happened slightly later)
-    # We only augment if the sequence is long enough to have meaningful shifts
-    if len(seq) > 10:
-        shift_amount = 3 # 3 frames
-        
-        # Shift Left
-        left_seq = np.roll(seq, -shift_amount, axis=0)
-        # zero out the end that rolled over
-        left_seq[-shift_amount:] = 0
-        sequences.append(process_sequence_single(left_seq, feature_size))
-        
-        # Shift Right
-        right_seq = np.roll(seq, shift_amount, axis=0)
-        # zero out the start that rolled over
-        right_seq[:shift_amount] = 0
-        sequences.append(process_sequence_single(right_seq, feature_size))
         
     return sequences
 
 def process_sequence_single(seq, feature_size):
     if len(seq) > MAX_SEQ_LENGTH:
-        return seq[:MAX_SEQ_LENGTH]
+        indices = np.linspace(0, len(seq) - 1, MAX_SEQ_LENGTH, dtype=int)
+        return seq[indices]
     elif len(seq) < MAX_SEQ_LENGTH:
         pad_amount = MAX_SEQ_LENGTH - len(seq)
         padding = np.zeros((pad_amount, feature_size))
@@ -113,6 +98,8 @@ def generate_background_samples(num_samples):
                 samples.append(processed_list[0])
         except Exception as e:
             print(f"    [Warning] Skipping corrupted background file: {f} - {e}")
+            
+    print(f"    -> Harvested {len(samples)} real idle sequences from background datasets.")
     return samples
 
 def main():
@@ -141,9 +128,9 @@ def main():
             y_data.append(label_id)
 
     # 2. Add background data
-    # To prevent false positives, background data should be at least equal to the largest class size,
-    # or even 1.5x larger, so the model learns to stay quiet by default.
-    num_bg = max(50, int(max_class_samples * 1.5))
+    # To prevent false positives, we must train heavily on ACTUAL idle videos from the Static dataset,
+    # NOT mathematical zeros, because mediapipe still outputs actual shoulders/face data when idle.
+    num_bg = max(150, int(max_class_samples * 6))
     bg_samples = generate_background_samples(num_bg)
     print(f"  -> Found {len(bg_samples)} valid background sequences.")
     for s in bg_samples:
