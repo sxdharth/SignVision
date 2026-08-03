@@ -129,13 +129,13 @@ The WebRTC platform integrates additional AI services for holistic communication
 
 ## 4. Current Status (What We Have Done)
 
-### ✅ Phase 1: Core Foundation (Completed)
+### Phase 1: Core Foundation (Completed)
 1.  **Project Restructuring**: Organized code into `src`, `web`, `tools` for modularity.
 2.  **Dataset Pipeline**: Built `wlasl_processor.py` to convert raw WLASL videos into `.npy` features.
     *   *Status*: **Running now**. ~900/12000 videos processed.
 3.  **Inference Engine**: Created an isolated Python class that loads the model and predicts signs.
 
-### ✅ Phase 2: User Platform (Completed)
+### Phase 2: User Platform (Completed)
 1.  **WebRTC Video Call**: Built a functional peer-to-peer video chat using `aiohttp` and `socket.io`.
 2.  **UI/UX**: Designed a premium "Dark Mode" interface with Accessibility Profile selection (Blind, Deaf, etc.).
 3.  **Real-Time Integration**: Connected the AI Brain to the Web Call.

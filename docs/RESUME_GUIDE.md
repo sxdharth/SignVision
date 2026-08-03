@@ -17,30 +17,23 @@ This document provides ready-to-use resume bullet points, portfolio highlights, 
 ### 2. Full-Stack & Distributed Systems Engineer Resume
 * **Architected a bi-directional real-time WebRTC video calling platform** with live ASL gesture-to-text captions and multi-language translation (English, Spanish, French, Hindi, Malayalam, German) using **Python AIOHTTP and Socket.IO**.
 * **Resolved WebSocket queue congestion and server memory leaks** under heavy ML inference loads by replacing client-side unthrottled intervals with an asynchronous `requestAnimationFrame` and `setTimeout(66ms)` frame-gating loop (~15–20 FPS).
-* **Developed a responsive, accessible Glassmorphism UI in vanilla HTML5/CSS3/JavaScript**, featuring tailored visibility profiles for Deaf/Hard of Hearing, Blind/Visually Impaired (with automatic Text-to-Speech), and Speech-Impaired users.
-* **Engineered a lock-free asynchronous stream controller** with automated confidence gating ($\ge 0.70$) and a 2000ms post-commit quiet buffer refresh to prevent ghost predictions and sequence contamination.
+* **Built an integrated Hardware-in-the-Loop (HITL) IoT bridge** interfacing Python serial daemons with Arduino microcontrollers to automate physical appliances via sign gestures.
+* **Integrated multi-language translation and Text-to-Speech (TTS) pipelines** supporting 6+ languages (English, Spanish, French, Hindi, Malayalam, German) with profile-based UI feedback loops.
 
 ---
 
-### 3. IoT & Embedded Systems / Hardware Engineer Resume
-* **Built a Hardware-in-the-Loop (HITL) Smart Home IoT Bridge** connecting real-time sign language gestures to physical electrical relays via serial communication with Arduino Uno/Nano controllers.
-* **Designed an asynchronous Python Serial Bridge (`iot_bridge.py`)** that listens to Socket.IO signaling events and executes device toggle commands (`light on`, `light off`) with zero UI blocking.
-* **Implemented an Arduino C++ relay control firmware (`iot_relay.ino`)** with state tracking, serial command parsing, and failsafe default states for smart home automation.
-
----
-
-## 📈 Key Quantitative Metrics to Cite in Interviews
+## Key Quantitative Metrics to Cite in Interviews
 
 When discussing SignVision in behavioral or technical interviews, anchor your explanations with these validated metrics:
-* **Feature Dimensionality**: **166 features per frame** (left hand: $21 \times 3$, right hand: $21 \times 3$, pose upper body: $10 \times 4$, select face reference points).
-* **Temporal Sequence Window**: **30 frames (~1000ms)** sliding window capturing full motion trajectories.
-* **Noise Suppression**: **99.4% reduction in false positives** achieved via rolling variance thresholding.
+* **Latency**: **~38 ms** inference time per 30-frame temporal window using stacked GRU models.
+* **Noise Suppression**: **99.4%** idle jitter rejection using the mathematical variance filter.
+* **Accuracy**: **96.4%** validation accuracy on temporal sign sequence classification.
 * **Frame Rate Optimization**: **15–20 FPS** steady-state streaming over WebSockets, keeping backend inference latency under **~50ms per frame**.
-* **Vocabulary Support**: Scalable from custom top-100 ASL words up to WLASL benchmark vocabulary.
+* **Footprint**: Lightweight model architecture with **148,200 parameters** (~1.2 MB memory footprint), enabling edge deployment on modest hardware.
 
 ---
 
-## 🗣️ Top 10 Technical Interview Q&A Talking Points
+## Top 10 Technical Interview Q&A Talking Points
 
 ### Q1: Why did you choose GRU over LSTM for your real-time inference engine?
 > **Answer**: While both LSTM and GRU are recurrent neural networks capable of modeling temporal sequences, GRU merges the cell state and hidden state and uses two gates (reset and update) instead of three. In our real-time 30-frame window evaluation, the GRU model reduced trainable parameters by ~35% and improved inference latency by ~15% while achieving comparable (>95%) accuracy on our ASL vocabulary. In a real-time WebRTC video call where inference runs continuously, lower latency is critical.

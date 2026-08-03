@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🤟 SignVision
+# SignVision
 ### AI-Powered Multimodal Communication & Smart Home IoT Automation Platform
 
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://python.org)
@@ -19,19 +19,19 @@
 
 ---
 
-## 🌟 Why SignVision?
+## Why SignVision?
 
 Traditional assistive communication tools operate as standalone, offline dictionaries. **SignVision** transforms sign language accessibility into a real-time, bi-directional communication suite built directly into a production WebRTC video calling environment.
 
-* **🚀 3D Spatial Feature Tracking**: Captures 166-dimensional holistic landmarks per frame (hands, pose, face) via MediaPipe, replacing heavy 3D-CNN RGB processing with lightweight, sub-50ms coordinate inference.
-* **🧠 Temporal Sequence Modeling**: Processes rolling 30-frame (~1000ms) spatio-temporal trajectories using stacked **Gated Recurrent Unit (GRU)** neural networks with **>95% validation accuracy**.
-* **🛡️ Zero-Motion Noise Suppression**: Incorporates an automated **Anti-Stationary Variance Filter** ($\sigma^2 < 0.005$) that eliminates **99.4% of idle webcam jitter and false positives**.
-* **🌐 Multilingual WebRTC Calling**: Peer-to-peer video streaming powered by an asynchronous AIOHTTP + Socket.IO signaling backend with live captions in English, Spanish, French, Hindi, Malayalam, and German.
-* **🏠 Hardware-in-the-Loop (HITL) Smart Home**: Extends sign gestures to physical automation, toggling Arduino-controlled electrical relays over USB serial communication.
+* **3D Spatial Feature Tracking**: Captures 166-dimensional holistic landmarks per frame (hands, pose, face) via MediaPipe, replacing heavy 3D-CNN RGB processing with lightweight, sub-50ms coordinate inference.
+* **Temporal Sequence Modeling**: Processes rolling 30-frame (~1000ms) spatio-temporal trajectories using stacked **Gated Recurrent Unit (GRU)** neural networks with **>95% validation accuracy**.
+* **Zero-Motion Noise Suppression**: Incorporates an automated **Anti-Stationary Variance Filter** ($\sigma^2 < 0.005$) that eliminates **99.4% of idle webcam jitter and false positives**.
+* **Multilingual WebRTC Calling**: Peer-to-peer video streaming powered by an asynchronous AIOHTTP + Socket.IO signaling backend with live captions in English, Spanish, French, Hindi, Malayalam, and German.
+* **Hardware-in-the-Loop (HITL) Smart Home**: Extends sign gestures to physical automation, toggling Arduino-controlled electrical relays over USB serial communication.
 
 ---
 
-## 🏗️ System Architecture & End-to-End Pipeline
+## System Architecture & End-to-End Pipeline
 
 ```mermaid
 graph TD
@@ -70,20 +70,20 @@ graph TD
 
 ---
 
-## ♿ Multi-Modal Accessibility Profiles
+## Multi-Modal Accessibility Profiles
 
 SignVision adapts its interface overlay and feedback loops dynamically based on the user's selected disability profile:
 
 | Profile | Primary Modality | Automated System Adaptation |
 | :--- | :--- | :--- |
-| 🤟 **Deaf / Hard of Hearing** | Visual | Renders high-contrast, low-latency live captions of remote speaker gestures and speech. |
-| 👁️ **Blind / Visually Impaired** | Audio | Automatically routes translated ASL captions through browser-native Text-to-Speech (TTS). |
-| 🗣️ **Speech-Impaired** | Sign $\rightarrow$ Audio / Text | Converts signer's ASL gestures into multilingual voiced speech for the remote caller. |
-| 🏠 **Smart Home User** | Gesture $\rightarrow$ Hardware | Maps ASL command signs (`light on`, `light off`) directly to Arduino relay triggers. |
+| **Deaf / Hard of Hearing** | Visual | Renders high-contrast, low-latency live captions of remote speaker gestures and speech. |
+| **Blind / Visually Impaired** | Audio | Automatically routes translated ASL captions through browser-native Text-to-Speech (TTS). |
+| **Speech-Impaired** | Sign $\rightarrow$ Audio / Text | Converts signer's ASL gestures into multilingual voiced speech for the remote caller. |
+| **Smart Home User** | Gesture $\rightarrow$ Hardware | Maps ASL command signs (`light on`, `light off`) directly to Arduino relay triggers. |
 
 ---
 
-## 📊 Model Architecture & Performance Benchmarks
+## Model Architecture & Performance Benchmarks
 
 SignVision models are trained and evaluated across rolling 30-frame temporal windows. Our stacked **Conv1D + GRU** architecture delivers optimal performance for low-latency video environments:
 
@@ -97,7 +97,7 @@ SignVision models are trained and evaluated across rolling 30-frame temporal win
 
 ---
 
-## ⚡ Quickstart & Installation
+## Quickstart & Installation
 
 ### 1. Prerequisites & Dependencies
 Ensure you have **Python 3.11+** installed, then clone the repository and install dependencies:
@@ -129,7 +129,7 @@ python signvision.py --mode iot
 
 ---
 
-## 📂 Enterprise Repository Structure
+## Enterprise Repository Structure
 
 ```
 SignVision/
@@ -159,7 +159,7 @@ SignVision/
 
 ---
 
-## 💼 Resume & Technical Portfolio Highlights
+## Resume & Technical Portfolio Highlights
 
 SignVision was architected to demonstrate full-stack engineering proficiency across **Deep Learning**, **Real-Time Systems**, and **Hardware-in-the-Loop (HITL) Embedded IoT**:
 
@@ -171,7 +171,7 @@ For tailored bullet points and answers to technical interview design questions, 
 
 ---
 
-## 📄 License & Contributing
+## License & Contributing
 
 SignVision is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.  
 Contributions, vocabulary expansions, and bug reports are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
