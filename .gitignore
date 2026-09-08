@@ -35,6 +35,8 @@ Models/
 Logs/
 asl_dataset/
 asl_dataset_video/
+MISC/
+docs/
 MISC/asl_dataset/
 MISC/asl_dataset_video/
 wlasl comparison/
