@@ -15,8 +15,6 @@
 
 ![SignVision WebRTC Video Call Platform](assets/videocall_platform.jpeg)
 
-[Explore Architecture](docs/ARCHITECTURE.md) • [Resume & Interview Guide](docs/RESUME_GUIDE.md) • [Model Benchmarks](docs/benchmarks/README.md) • [Error & Bug Catalog](docs/ERRORS_AND_FIXES.md)
-
 </div>
 
 ---
@@ -126,9 +124,11 @@ python signvision.py --mode web
 
 # Launch standalone Desktop Detection Mode (OpenCV local window)
 python signvision.py --mode desktop
+```
 
 ![Desktop Application Prototype](assets/desktop_prototype.jpeg)
 
+```bash
 # Launch standalone Arduino IoT Relay Bridge
 python signvision.py --mode iot
 ```
@@ -145,11 +145,6 @@ python signvision.py --mode iot
 SignVision/
 ├── signvision.py               # Unified CLI Launcher (Web, Desktop, IoT modes)
 ├── requirements.txt            # Categorized dependency manifest
-├── docs/                       # Architectural Specifications & Engineering Guides
-│   ├── ARCHITECTURE.md         # Deep-dive System & ML Pipeline Architecture
-│   ├── RESUME_GUIDE.md         # Ready-to-copy Resume Bullet Points & Interview Q&A
-│   ├── ERRORS_AND_FIXES.md     # Production Bug Catalog & Pipeline Guardrails
-│   └── benchmarks/             # Model Evaluation Logs, Classification Reports & WLASL Charts
 ├── src/                        # Core ML Engine & Desktop Application Logic
 │   ├── feature_extractor.py    # MediaPipe Holistic 166-feature Spatial Extractor
 │   ├── inference_engine.py     # Rolling 30-frame GRU/LSTM Temporal Classifier + Variance Filter
@@ -175,9 +170,7 @@ SignVision was architected to demonstrate full-stack engineering proficiency acr
 
 * **Mathematical Noise Rejection**: Designed an Anti-Stationary Variance Filter ($\sigma^2 < 0.005$) over 166-dimensional spatial trajectories to prevent idle webcam jitter from triggering false predictions.
 * **Network & Memory Contention Optimization**: Eliminated WebSocket queue congestion and `aiohttp` memory crashes by engineering a client-side `requestAnimationFrame` + `setTimeout(66ms)` throttled frame loop.
-* **Enterprise Error Documentation**: Maintained a comprehensive, chronological [Bug & Fix Catalog](docs/ERRORS_AND_FIXES.md) detailing root causes, architectural fixes, and regression guardrails for 15+ production issues.
-
-For tailored bullet points and answers to technical interview design questions, check out the [Resume & Interview Guide](docs/RESUME_GUIDE.md).
+* **Enterprise Error Documentation**: Maintained a comprehensive, chronological Bug & Fix Catalog detailing root causes, architectural fixes, and regression guardrails for 15+ production issues.
 
 ---
 
