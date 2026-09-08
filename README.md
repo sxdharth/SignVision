@@ -13,6 +13,8 @@
 
 *An end-to-end distributed accessibility platform bridging communication for Deaf, Hard of Hearing, Blind, and Speech-Impaired individuals through low-latency WebRTC video calling, temporal RNN sign recognition, and Arduino hardware automation.*
 
+![SignVision WebRTC Video Call Platform](assets/videocall_platform.jpeg)
+
 [Explore Architecture](docs/ARCHITECTURE.md) • [Resume & Interview Guide](docs/RESUME_GUIDE.md) • [Model Benchmarks](docs/benchmarks/README.md) • [Error & Bug Catalog](docs/ERRORS_AND_FIXES.md)
 
 </div>
@@ -29,9 +31,13 @@ Traditional assistive communication tools operate as standalone, offline diction
 * **Multilingual WebRTC Calling**: Peer-to-peer video streaming powered by an asynchronous AIOHTTP + Socket.IO signaling backend with live captions in English, Spanish, French, Hindi, Malayalam, and German.
 * **Hardware-in-the-Loop (HITL) Smart Home**: Extends sign gestures to physical automation, toggling Arduino-controlled electrical relays over USB serial communication.
 
+![Smart Home Automation Implementation](assets/smart_home_automation.jpeg)
+
 ---
 
 ## System Architecture & End-to-End Pipeline
+
+![System Architecture](assets/architecture.jpeg)
 
 ```mermaid
 graph TD
@@ -85,6 +91,8 @@ SignVision adapts its interface overlay and feedback loops dynamically based on 
 
 ## Model Architecture & Performance Benchmarks
 
+![GRU vs LSTM EDA](assets/gru_lstm_eda.jpeg)
+
 SignVision models are trained and evaluated across rolling 30-frame temporal windows. Our stacked **Conv1D + GRU** architecture delivers optimal performance for low-latency video environments:
 
 | Model Architecture | Params | Inference Latency | Val Accuracy | False-Positive Rejection | Memory Footprint |
@@ -118,6 +126,8 @@ python signvision.py --mode web
 
 # Launch standalone Desktop Detection Mode (OpenCV local window)
 python signvision.py --mode desktop
+
+![Desktop Application Prototype](assets/desktop_prototype.jpeg)
 
 # Launch standalone Arduino IoT Relay Bridge
 python signvision.py --mode iot
