@@ -41,6 +41,11 @@ MISC/asl_dataset/
 MISC/asl_dataset_video/
 wlasl comparison/
 
+# Deprecated / local run wrappers
+run.py
+run_platform.py
+run_smart_home.py
+
 # IDEs & Editor configs
 .idea/
 .vscode/
