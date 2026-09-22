@@ -30,8 +30,9 @@ Thumbs.db
 *.avi
 *.mov
 *.mkv
-Data/
-Models/
+Data/*
+!Data/*.json
+!Models/
 Logs/
 asl_dataset/
 asl_dataset_video/

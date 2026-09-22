@@ -1,0 +1,9 @@
+{
+    "goodbye": 0,
+    "hello": 1,
+    "how": 2,
+    "please": 3,
+    "sorry": 4,
+    "thanks": 5,
+    "yes": 6
+}
