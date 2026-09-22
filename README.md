@@ -104,7 +104,17 @@ SignVision models are trained and evaluated across rolling 30-frame temporal win
 
 ## Quickstart & Installation
 
-### 1. Prerequisites & Dependencies
+### Option 1: Run with Docker (Recommended)
+You can instantly launch the entire WebRTC platform and inference engine without installing Python dependencies using Docker:
+```bash
+git clone https://github.com/sxdharth/SignVision.git
+cd SignVision
+docker build -t signvision .
+docker run -p 8080:8080 signvision
+```
+The platform will automatically start on `http://localhost:8080`.
+
+### Option 2: Local Python Installation
 Ensure you have **Python 3.11+** installed, then clone the repository and install dependencies:
 
 ```bash
