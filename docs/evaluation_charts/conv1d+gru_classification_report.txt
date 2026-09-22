@@ -1,0 +1,13 @@
+              precision    recall  f1-score   support
+
+     goodbye       0.95      1.00      0.98        20
+       hello       1.00      0.95      0.97        20
+         how       1.00      1.00      1.00        20
+      please       1.00      1.00      1.00        20
+       sorry       1.00      1.00      1.00        20
+      thanks       1.00      1.00      1.00        20
+         yes       1.00      1.00      1.00        20
+
+    accuracy                           0.99       140
+   macro avg       0.99      0.99      0.99       140
+weighted avg       0.99      0.99      0.99       140

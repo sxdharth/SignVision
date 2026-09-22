@@ -1,0 +1,19 @@
+COMPREHENSIVE K-FOLD RESULTS
+==========================
+Mean Train Accuracy: 98.51% (Std: ±1.39%)
+Mean Test Accuracy:  99.29% (Std: ±0.64%)
+
+Classification Report:
+              precision    recall  f1-score   support
+
+     goodbye       0.99      0.99      0.99       100
+       hello       0.99      0.99      0.99       100
+         how       0.98      0.99      0.99       100
+      please       1.00      1.00      1.00       100
+       sorry       0.99      1.00      1.00       100
+      thanks       1.00      0.99      0.99       100
+         yes       1.00      0.99      0.99       100
+
+    accuracy                           0.99       700
+   macro avg       0.99      0.99      0.99       700
+weighted avg       0.99      0.99      0.99       700

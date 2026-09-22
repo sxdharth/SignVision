@@ -1,0 +1,85 @@
+--- DATA DISTRIBUTION REPORT ---
+Total Classes: 2000
+Max samples in a class: 16
+Min samples in a class: 2
+Average samples: 6.0
+
+--- VIABILITY CHECK ---
+Classes with > 100 samples (Excellent): 0
+Classes with > 50 samples  (Good):      0
+Classes with > 20 samples  (Okay):      0
+Classes with < 10 samples  (Garbage):   1896
+
+Top 50 Classes by Data Volume:
+  before: 16
+  cool: 16
+  thin: 16
+  drink: 15
+  go: 15
+  computer: 14
+  cousin: 14
+  help: 14
+  who: 14
+  accident: 13
+  bed: 13
+  bowling: 13
+  candy: 13
+  short: 13
+  tall: 13
+  thanksgiving: 13
+  trade: 13
+  basketball: 12
+  call: 12
+  change: 12
+  cold: 12
+  corn: 12
+  dark: 12
+  last: 12
+  later: 12
+  man: 12
+  pizza: 12
+  shirt: 12
+  what: 12
+  yes: 12
+  apple: 11
+  bar: 11
+  brother: 11
+  champion: 11
+  check: 11
+  deaf: 11
+  delay: 11
+  dog: 11
+  environment: 11
+  example: 11
+  family: 11
+  far: 11
+  laugh: 11
+  leave: 11
+  letter: 11
+  mother: 11
+  no: 11
+  play: 11
+  room: 11
+  score: 11
+
+Bottom 20 Classes:
+  upstairs: 3
+  value: 3
+  waiter: 3
+  weigh: 3
+  whistle: 3
+  wrench: 3
+  careless: 2
+  curtain: 2
+  gloves: 2
+  grey: 2
+  lamp: 2
+  look at: 2
+  meaning: 2
+  post: 2
+  propaganda: 2
+  ski: 2
+  smoking: 2
+  stepfather: 2
+  tv: 2
+  wash face: 2

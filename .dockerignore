@@ -1,0 +1,16 @@
+.git
+.gitignore
+.agent
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.pdf
+*.md
+.Python
+env
+venv
+Logs/
+MISC/
+wlasl comparison/
