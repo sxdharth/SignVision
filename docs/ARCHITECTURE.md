@@ -2,6 +2,7 @@
 
 **Version:** 2.0.0  
 **Author:** SignVision Engineering Team  
+**License:** MIT  
 
 ---
 

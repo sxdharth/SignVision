@@ -9,6 +9,7 @@
 [![WebRTC](https://img.shields.io/badge/WebRTC-Real--Time-333333?logo=webrtc&logoColor=white)](https://webrtc.org)
 [![AsyncIO](https://img.shields.io/badge/AIOHTTP-Socket.IO-2C5BB4?logo=python&logoColor=white)](https://docs.aiohttp.org)
 [![Arduino](https://img.shields.io/badge/Arduino-IoT--Bridge-00979D?logo=arduino&logoColor=white)](https://arduino.cc)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 *An end-to-end distributed accessibility platform bridging communication for Deaf, Hard of Hearing, Blind, and Speech-Impaired individuals through low-latency WebRTC video calling, temporal RNN sign recognition, and Arduino hardware automation.*
 
@@ -183,6 +184,7 @@ SignVision was architected to demonstrate full-stack engineering proficiency acr
 
 ---
 
-## Contributing
+## License & Contributing
 
+SignVision is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.  
 Contributions, vocabulary expansions, and bug reports are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
